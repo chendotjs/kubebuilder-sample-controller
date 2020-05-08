@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
@@ -94,6 +95,8 @@ func (r *MyKindReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if myKind.Spec.Replicas != nil {
 		expectedReplicas = *myKind.Spec.Replicas
 	}
+	log.Info(fmt.Sprintf("expected replicas is: %v", expectedReplicas))
+
 	if *deployment.Spec.Replicas != expectedReplicas {
 		log.Info("updating replica count", "old_count", *deployment.Spec.Replicas, "new_count", expectedReplicas)
 
@@ -130,15 +133,18 @@ func (r *MyKindReconciler) cleanupOwnedResources(ctx context.Context, log logr.L
 
 	// List all deployment resources owned by this MyKind
 	var deployments apps.DeploymentList
-	if err := r.List(ctx, &deployments, client.InNamespace(myKind.Namespace), client.MatchingField(deploymentOwnerKey, myKind.Name)); err != nil {
+	if err := r.Client.List(ctx, &deployments, client.InNamespace(myKind.Namespace), client.MatchingField(deploymentOwnerKey, myKind.Name)); err != nil {
 		return err
 	}
+
+	log.Info(fmt.Sprintf("list %d deployments owned by this MyKind: %+v", len(deployments.Items), deployments.Items))
 
 	deleted := 0
 	for _, depl := range deployments.Items {
 		if depl.Name == myKind.Spec.DeploymentName {
 			// If this deployment's name matches the one on the MyKind resource
 			// then do not delete it.
+			log.Info(fmt.Sprintf("find mykind deployment: %v", depl.Name))
 			continue
 		}
 
